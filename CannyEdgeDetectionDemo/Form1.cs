@@ -434,7 +434,7 @@ namespace CannyEdgeDetectionDemo
             }
 
             // evaluate top 5% and low 5%
-            List<int> sortedYValues = new List<int>();
+            Dictionary<int, int> yHist = new Dictionary<int, int>();
             List<int> topYValues = new List<int>();
             List<int> lowYValues = new List<int>();
 
@@ -442,15 +442,21 @@ namespace CannyEdgeDetectionDemo
             {
                 for (int col = 0; col < width; col++)
                 {
-                    int y = pixelMatrix[row][col].y;
-                    if (!sortedYValues.Contains(y))
+                    int y = pixelMatrix[row][col].smoothY;
+                    if (!yHist.ContainsKey(y))
                     {
-                        sortedYValues.Add(y);
+                        yHist.Add(y, 0);
+                    } else
+                    {
+                        yHist[y]++;
                     }
                 }
             }
 
-            sortedYValues.Sort();
+            Dictionary<int, int>.KeyCollection keyColl = yHist.Keys;
+            List<int> sortedYValues = keyColl.ToList();
+            sortedYValues.Sort(new Comparison<int>(
+                (i1, i2) => yHist[i2].CompareTo(yHist[i1])));
             int numberOfTopOrLow = sortedYValues.Count / 100 * 5;
             for (int i = 0; i < numberOfTopOrLow; i++)
             {
@@ -463,7 +469,7 @@ namespace CannyEdgeDetectionDemo
             {
                 for (int col = 0; col < width; col++)
                 {
-                    int y = pixelMatrix[row][col].y;
+                    int y = pixelMatrix[row][col].smoothY;
                     if (lowYValues.Contains(y))
                     {
                         pixelMatrix[row][col].isEdge = IsEdge.No;
@@ -475,6 +481,18 @@ namespace CannyEdgeDetectionDemo
                 }
             }
 
+            // duplicate the MyPixel matrix
+            IsEdge[][] edgeMatrix = new IsEdge[height][];
+            for (int i = 0; i < height; i++)
+            {
+                edgeMatrix[i] = new IsEdge[width];
+
+                for (int j = 0; j < width; j++)
+                {
+                    edgeMatrix[i][j] = pixelMatrix[i][j].isEdge;
+                }
+            }
+
             // Get rid of Maybes
             for (int row = 0; row < height; row++)
             {
@@ -482,7 +500,83 @@ namespace CannyEdgeDetectionDemo
                 {
                     if (pixelMatrix[row][col].isEdge == IsEdge.Maybe)
                     {
-                        
+                        bool isTopEdge = row == 0;
+                        bool isBottomEdge = row == height - 1;
+                        bool isLeftEdge = col == 0;
+                        bool isRightEdge = col == width - 1;
+
+                        if (!isLeftEdge)
+                        {
+                            // do row and col - 1 check
+                            if (pixelMatrix[row][col - 1].isEdge == IsEdge.Yes)
+                            {
+                                edgeMatrix[row][col] = IsEdge.Yes;
+                                continue;
+                            }
+                        }
+                        if (!isRightEdge)
+                        {
+                            // do row and col + 1 check
+                            if (pixelMatrix[row][col + 1].isEdge == IsEdge.Yes)
+                            {
+                                edgeMatrix[row][col] = IsEdge.Yes;
+                                continue;
+                            }
+                        }
+                        if (!isTopEdge)
+                        {
+                            // do row - 1 and col check
+                            if (pixelMatrix[row - 1][col].isEdge == IsEdge.Yes)
+                            {
+                                edgeMatrix[row][col] = IsEdge.Yes;
+                                continue;
+                            }
+                            if (!isLeftEdge)
+                            {
+                                // do row - 1 and col - 1 check
+                                if (pixelMatrix[row - 1][col - 1].isEdge == IsEdge.Yes)
+                                {
+                                    edgeMatrix[row][col] = IsEdge.Yes;
+                                    continue;
+                                }
+                            }
+                            if (!isRightEdge)
+                            {
+                                // do row - 1 and col + 1 check
+                                if (pixelMatrix[row - 1][col + 1].isEdge == IsEdge.Yes)
+                                {
+                                    edgeMatrix[row][col] = IsEdge.Yes;
+                                    continue;
+                                }
+                            }
+                        }
+                        if (!isBottomEdge)
+                        {
+                            // do row + 1 and col check
+                            if (pixelMatrix[row + 1][col].isEdge == IsEdge.Yes)
+                            {
+                                edgeMatrix[row][col] = IsEdge.Yes;
+                                continue;
+                            }
+                            if (!isLeftEdge)
+                            {
+                                // do row + 1 and col - 1 check
+                                if (pixelMatrix[row + 1][col - 1].isEdge == IsEdge.Yes)
+                                {
+                                    edgeMatrix[row][col] = IsEdge.Yes;
+                                    continue;
+                                }
+                            }
+                            if (!isRightEdge)
+                            {
+                                // do row + 1 and col + 1 check
+                                if (pixelMatrix[row + 1][col + 1].isEdge == IsEdge.Yes)
+                                {
+                                    edgeMatrix[row][col] = IsEdge.Yes;
+                                    continue;
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -493,7 +587,7 @@ namespace CannyEdgeDetectionDemo
             {
                 for (int col = 0; col < width; col++)
                 {
-                    IsEdge isEdge = pixelMatrix[row][col].isEdge;
+                    IsEdge isEdge = edgeMatrix[row][col];
                     if (isEdge == IsEdge.Yes)
                     {
                         newBitmap.SetPixel(col, row, Color.White);
